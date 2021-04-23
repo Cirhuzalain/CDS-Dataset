@@ -11,7 +11,7 @@
 You can clone the repository with `git clone https://github.com/Cirhuzalain/cdsdataset`
 After cloning the project use `cd cdsdataset`
 
-## Install Dependency
+## Install Dependencies
 Use `pip install -r requirements.txt` command
 
 ## Get document sample
