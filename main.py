@@ -5,7 +5,9 @@ import uuid
 import signal
 import sys
 import requests as rq
+
 from random import shuffle
+from typing import List
 from concurrent.futures import wait, ThreadPoolExecutor
 
 from utils import load_seeding, get_template, get_url, get_page_info, write_json, switch_ip, log_message, setup_folder
@@ -14,7 +16,7 @@ class InitialSeed:
     """
         Get initial seeding
     """
-    def __init__(self, file_name, thread_number):
+    def __init__(self, file_name : str, thread_number : int) -> None:
         """
             Initialize seeding
         """
@@ -25,7 +27,7 @@ class InitialSeed:
                         "www.bbc.com/news", "www.bbc.com/afrique", "www.dw.com/en", 
                         "www.dw.com/fr", "www.dw.com/sw", "www.voanews.com", "www.voaafrique.com", "www.voaswahili.com"]
 
-    def get_seeding(self):
+    def get_seeding(self)->None:
         """
             Get seeding link from common crawl using seeding detail
         """
@@ -34,7 +36,7 @@ class InitialSeed:
         print("Done saving seeding file !!!")
 
 
-    def get_seeding_links(self, seedings):
+    def get_seeding_links(self, seedings: List[str]) -> None:
         """
             Save web links results from each common crawl endpoint
         """
@@ -44,7 +46,7 @@ class InitialSeed:
             print(f"Done with {sed} !!!")
 
 
-    def parse_common_crawl(self, link_metadata, link_to_check):
+    def parse_common_crawl(self, link_metadata: List[str], link_to_check: str) -> List[str]:
         """
             Parse common crawl URL
         """
@@ -69,7 +71,7 @@ class TransformDataset:
         Data transformation from seeding link to document
     """
 
-    def __init__(self, file_name, retry, thread_number, sample_number):
+    def __init__(self, file_name: str, retry : int, thread_number : int, sample_number: int) -> None:
         """
             Initialize attributes
         """
@@ -84,7 +86,7 @@ class TransformDataset:
             self.set_seeding_info(sample_number)
         self.set_up_exit()
         
-    def set_up_exit(self):
+    def set_up_exit(self) -> None:
         signal.signal(signal.SIGINT, self.signal_handler)
 
     def signal_handler(self, sig, frame):
@@ -92,7 +94,7 @@ class TransformDataset:
         self.save_data(True)
         sys.exit(0)
 
-    def set_seeding_info(self, sample_number):
+    def set_seeding_info(self, sample_number: int) -> None:
         tmp_dico = {}
         for key in list(self.seeding_info.keys()):
             tmp_info = self.seeding_info[key] 
@@ -101,7 +103,7 @@ class TransformDataset:
 
         self.seeding_info = tmp_dico
 
-    def start_crawling(self):
+    def start_crawling(self) -> None:
         """
             Crawl weblinks using selenium
         """
@@ -124,7 +126,7 @@ class TransformDataset:
         
         self.save_data()
 
-    def save_data(self, is_signal=False):
+    def save_data(self, is_signal=False) -> None:
         tmp_name = self.current_key.replace('/', '-')
         hash_file_name = uuid.uuid4().hex
         if is_signal:
@@ -133,7 +135,7 @@ class TransformDataset:
             write_json(self.final_data, f"{tmp_name}{hash_file_name}-success.json")
         write_json(self.errors, f"{tmp_name}{hash_file_name}-error.json")
 
-    def get_document(self, url):
+    def get_document(self, url: str) -> None:
         """
             Create document info
         """

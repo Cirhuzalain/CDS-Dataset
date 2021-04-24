@@ -3,18 +3,23 @@ import uuid
 import requests
 import os
 import logging
+
+from logging  import Logger
 from stem import Signal
 from pathlib import Path
 from stem.control import Controller
 from bs4 import BeautifulSoup
+from typing import List, Dict, Tuple
 
-def setup_folder():
+def setup_folder() -> None:
+    if not os.path.exists('error'):
+        os.makedirs('error')
     if not os.path.exists('seeding'):
         os.makedirs('seeding')
     if not os.path.exists('content'):
         Path('content/img/').mkdir(parents=True, exist_ok=True)
 
-def get_logger(name, file):
+def get_logger(name : str , file : str) -> Logger:
     handler = logging.FileHandler(file)
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 
@@ -24,7 +29,7 @@ def get_logger(name, file):
 
     return logger
 
-def log_message(message, msg_type):
+def log_message(message : str, msg_type : str) -> None:
     if msg_type == 'http':
         logger = get_logger('http', 'error/error_url.log')
     elif msg_type == 'doc':
@@ -35,7 +40,7 @@ def log_message(message, msg_type):
         logger = get_logger('img', 'error/error_img.log')
     logger.error(message)
 
-def get_headers():
+def get_headers() -> Tuple[Dict, Dict]:
     proxies = {
     'http': 'socks5://127.0.0.1:9050',
     'https': 'socks5://127.0.0.1:9050'
@@ -44,7 +49,7 @@ def get_headers():
                 'Accept-Encoding': 'gzip, compress, deflate, identity, br',}
     return headers, proxies
 
-def get_url(url, retry, key):
+def get_url(url : str, retry : int, key : str) -> Tuple[str, bool]:
     connection_attempt = 0
     url = url.rstrip("\n")
     # handle bbc url with amp page
@@ -68,10 +73,14 @@ def get_url(url, retry, key):
         connection_attempt += 1
     return "", False
 
-def get_page_info(page, key, url, retry):
+def get_page_info(page : str, key : str, url : str, retry : int) -> Tuple[Dict, bool]:
     is_document = False
     template_info = get_template()[key]
     page_details = get_page_details(page, template_info, key)
+
+    if len(page_details['document']) == 0 and len(page_details["headline"]) == 0 and len(page_details["title"]) == 0:
+        page_details = parse_custom_page(page)
+        
     image_src = page_details['image_src']
 
     # DW add domain name 
@@ -90,31 +99,53 @@ def get_page_info(page, key, url, retry):
         'url': url
     }, is_document
 
-def write_json(content, file_name):
+def write_json(content, file_name : str) -> None:
     file_info = f"content/{file_name}"
     with open(file_info, 'w') as fout:
         json.dump(content, fout)
 
-def load_seeding(file_name):
-    """
-        Loading file seeding file
-    """
+def load_seeding(file_name : str) -> None:
     file_info = f"seeding/{file_name}"
     with open(file_info, "r") as read_file:
         data = json.load(read_file)
     return data
 
-def switch_ip():
+def switch_ip() -> None:
     with Controller.from_port(port = 9051) as controller:
         controller.authenticate()
         controller.signal(Signal.NEWNYM)
 
-def get_custom_src(page, template_info):
+def get_custom_src(page : BeautifulSoup, template_info : Dict) -> str:
     image = page.select(template_info['img'][2])
     img_src = image[0]['data-src'] if len(image) > 0 else ''
     return img_src
 
-def get_page_details(page, template_info, key):
+def parse_custom_page(page : str) -> Dict:
+    page_info = BeautifulSoup(page, 'html.parser')
+
+    title = page_info.select("h1")
+    title = title[0].text if len(title) > 0 else ""
+
+    headline = page_info.select("p b")
+    headline = headline[0].text if len(headline) > 0 else ""
+
+    document = page_info.select("p:not(b)")
+    document = " \n ".join([p.text for p in document[1:]])
+
+    img = page_info.select("div figure img")
+    images = [im.attrs['src'] for im in img]
+
+    captions = page_info.select("figcaption p")
+    if len(captions) == 0:
+        captions = page_info.select("figcaption")
+    captions = [cap.text for cap in captions]
+    return {"title" : title, 
+            "headline" : headline, 
+            "document" : document,
+            "image_src" : images, 
+            "image_desc" : captions}
+
+def get_page_details(page : str, template_info : Dict, key : str) -> Dict:
     page_soup = BeautifulSoup(page, 'html.parser')
     
     title = page_soup.select(template_info['title'][0])
@@ -185,7 +216,7 @@ def get_page_details(page, template_info, key):
         'image_src': image_src
     }
 
-def get_template():
+def get_template() -> Dict:
     dico = {"sw.rfi.fr" : {'title' : ['article h1'], 'headline' : ['p.t-content__chapo'], 
                             'document' : ['div.t-content__body p'], 'img' : ['img.m-figure__img'], 
                             'img_desc' : ['figcaption.m-figure__caption span']}, 
